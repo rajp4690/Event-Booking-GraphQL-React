@@ -1,10 +1,12 @@
+const { buildSchema } = require('graphql');
 const express = require('express');
 const bodyparser = require('body-parser');
 const graphqlHttp = require('express-graphql');
-const { buildSchema } = require('graphql');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const Event = require('./models/event');
+const User = require('./models/user');
 
 const app = express();
 
@@ -20,11 +22,22 @@ app.use('/graphql', graphqlHttp({
             date: String!
         }
 
+        type User {
+            _id: ID!
+            email: String!
+            password: String
+        }
+
         input EventInput {
             title: String!
             description: String!
             price: Float!
             date: String!
+        }
+
+        input UserInput {
+            email: String!
+            password: String!
         }
 
         type RootQuery {
@@ -33,6 +46,7 @@ app.use('/graphql', graphqlHttp({
 
         type RootMutation {
             createEvent(eventInput: EventInput): Event
+            createUser(userInput: UserInput): User
         }
 
         schema {
@@ -41,29 +55,46 @@ app.use('/graphql', graphqlHttp({
         }
     `),
     rootValue: {
-        events: () => {
-            return Event.find().then((result) => {
-                return result.map((event) => {
-                    return { ...event._doc };
-                });
-            }).catch((err) => {
+        events: async () => {
+            try {
+                return await Event.find();
+            } catch (err) {
                 throw err;
-            });
+            }
         },
-        createEvent: (args) => {
+        createEvent: async (args) => {
             const event = new Event({
                 title: args.eventInput.title,
                 description: args.eventInput.description,
                 price: +args.eventInput.price,
-                date: new Date(args.eventInput.date)
+                date: new Date(args.eventInput.date),
+                creator: '5c51ff46fb495fc548c36666'
             });
-            return event.save().then((result) => {
-                console.log(result);
-                return { ...result._doc };
-            }).catch((err) => {
-                console.log(err);
+            try {
+                const result = await event.save();
+                let user = await User.findById('5c51ff46fb495fc548c36666');
+                if(!user) {
+                    throw new Error('User not found');
+                }
+                user.createdEvents.push(event);
+                await user.save();
+                return result;
+            } catch (err) {
                 throw err;
-            });
+            }
+        },
+        createUser: async (args) => {
+            try {
+                const hashedPassword = await bcrypt.hash(args.userInput.password, 12);
+                let user = new User({
+                    email: args.userInput.email,
+                    password: hashedPassword
+                });
+                user = await user.save();
+                return {...user._doc, password: null};
+            } catch (err) {
+                throw err;
+            }
         }
     },
     graphiql: true
