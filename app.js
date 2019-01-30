@@ -12,6 +12,26 @@ const app = express();
 
 app.use(bodyparser.json());
 
+const events = async (eventIds) => {
+    try {
+        let eventList = await Event.find({ _id: { $in: eventIds } });
+        return eventList.map((event) => {
+            return { ...event._doc, creator: user.bind(this, event.creator)};
+        });
+    } catch (err) {
+        throw err;
+    }
+};
+
+const user = async (userId) => {
+    try {
+        let result = await User.findById(userId);
+        return { ...result._doc, createdEvents: events.bind(this, result.createdEvents), password: null};
+    } catch (err) {
+        throw err;
+    }
+};
+
 app.use('/graphql', graphqlHttp({
     schema: buildSchema(`
         type Event {
@@ -20,12 +40,14 @@ app.use('/graphql', graphqlHttp({
             description: String!
             price: Float!
             date: String!
+            creator: User!
         }
 
         type User {
             _id: ID!
             email: String!
             password: String
+            createdEvents: [Event!]
         }
 
         input EventInput {
@@ -57,7 +79,10 @@ app.use('/graphql', graphqlHttp({
     rootValue: {
         events: async () => {
             try {
-                return await Event.find();
+                let eventList = await Event.find();
+                return eventList.map((event) => {
+                    return {...event._doc, creator: user.bind(this, event.creator)};
+                });
             } catch (err) {
                 throw err;
             }
@@ -72,13 +97,13 @@ app.use('/graphql', graphqlHttp({
             });
             try {
                 const result = await event.save();
-                let user = await User.findById('5c51ff46fb495fc548c36666');
-                if(!user) {
+                let userData = await User.findById('5c51ff46fb495fc548c36666');
+                if(!userData) {
                     throw new Error('User not found');
                 }
-                user.createdEvents.push(event);
-                await user.save();
-                return result;
+                userData.createdEvents.push(event);
+                await userData.save();
+                return { ...result._doc, creator: user.bind(this, result.creator)};
             } catch (err) {
                 throw err;
             }
