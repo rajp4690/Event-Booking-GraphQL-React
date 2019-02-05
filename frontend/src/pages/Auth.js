@@ -17,8 +17,8 @@ class AuthPage extends Component {
     }
 
     switchModeHandler = () => {
-        this.setState((preState) => {
-            return { isLogin: !preState.isLogin };
+        this.setState((prevState) => {
+            return { isLogin: !prevState.isLogin };
         });
     };
 
