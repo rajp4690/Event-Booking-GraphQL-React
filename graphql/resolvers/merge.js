@@ -14,7 +14,7 @@ const userLoader = new DataLoader((userIds) => {
 
 const events = async (eventIds) => {
     try {
-        const eventList = await Event.find({ _id: { $in: eventIds } });
+        const eventList = await Event.find({_id: {$in: eventIds}});
         return eventList.map((event) => {
             return populatedEvent(event);
         });
@@ -35,7 +35,7 @@ const singleEvent = async (eventId) => {
 const user = async (userId) => {
     try {
         const result = await userLoader.load(userId.toString());
-        return { ...result._doc, createdEvents: eventLoader.loadMany.bind(this, result.createdEvents), password: null};
+        return { ...result._doc, createdEvents: () => eventLoader.loadMany(result.createdEvents), password: null};
     } catch (err) {
         throw err;
     }
